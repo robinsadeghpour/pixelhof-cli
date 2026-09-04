@@ -50,9 +50,11 @@ export function clearConfig(): void {
  * whatever the last login stored, so a developer can point one command at a
  * local server without logging out of the real one.
  */
-export function resolveUrl(explicit?: string | undefined): string {
+export function resolveUrl(explicit?: string | undefined, stored?: Config | null): string {
   const env = process.env['PIXELHOF_URL'];
-  return explicit ?? (env !== undefined && env !== '' ? env : null) ?? readConfig()?.url ?? PRODUCTION_URL;
+  if (explicit !== undefined && explicit !== '') return explicit;
+  if (env !== undefined && env !== '') return env;
+  return (stored === undefined ? readConfig() : stored)?.url ?? PRODUCTION_URL;
 }
 
 /**
