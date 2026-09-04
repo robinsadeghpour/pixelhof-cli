@@ -1,0 +1,157 @@
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { beatCommand, configFileFor, install, isInstalled, uninstall } from '../src/lib/install.js';
+import { INTEGRATIONS, integrationFor } from '../src/lib/integrations.js';
+
+/**
+ * The installer against a home directory of its own.
+ *
+ * Every path in the CLI hangs off `homedir()`, which reads HOME on each call,
+ * so pointing HOME at a temp directory redirects the whole install and no test
+ * can reach a real settings file.
+ */
+
+let home = '';
+let realHome: string | undefined;
+
+beforeEach(() => {
+  realHome = process.env['HOME'];
+  home = mkdtempSync(join(tmpdir(), 'pixelhof-test-'));
+  process.env['HOME'] = home;
+});
+
+afterEach(() => {
+  if (realHome === undefined) delete process.env['HOME'];
+  else process.env['HOME'] = realHome;
+  rmSync(home, { recursive: true, force: true });
+});
+
+const claude = integrationFor('claude-code')!;
+
+const bytesOf = (path: string): string => readFileSync(path, 'utf8');
+
+function seed(path: string, text: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text, 'utf8');
+}
+
+describe('install', () => {
+  test('writes into every agent, then reports the second run as a no-op', () => {
+    for (const integration of INTEGRATIONS) {
+      expect(install(integration, false).action, integration.id).toBe('written');
+    }
+    for (const integration of INTEGRATIONS) {
+      expect(install(integration, false).action, integration.id).toBe('unchanged');
+      expect(isInstalled(integration), integration.id).toBe(true);
+    }
+  });
+
+  test('installing twice leaves the same bytes as installing once', () => {
+    for (const integration of INTEGRATIONS) {
+      install(integration, false);
+      const once = bytesOf(configFileFor(integration));
+      install(integration, false);
+      expect(bytesOf(configFileFor(integration)), integration.id).toBe(once);
+    }
+  });
+
+  test('a dry run changes nothing on disk', () => {
+    for (const integration of INTEGRATIONS) {
+      expect(install(integration, true).action).toBe('written');
+      expect(isInstalled(integration), integration.id).toBe(false);
+    }
+  });
+
+  test('the hook command names the agent, and prefers a binary on PATH', () => {
+    expect(beatCommand('cursor', true)).toBe('pixelhof beat --agent cursor');
+    expect(beatCommand('cursor', false)).toBe('npx -y pixelhof beat --agent cursor');
+  });
+});
+
+describe('uninstall', () => {
+  test('a file this CLI created is taken away again, not left empty', () => {
+    for (const integration of INTEGRATIONS) {
+      install(integration, false);
+      expect(uninstall(integration, false).action, integration.id).toBe('removed');
+      expect(isInstalled(integration), integration.id).toBe(false);
+    }
+  });
+
+  test('a file the person already had comes back byte for byte', () => {
+    const path = configFileFor(claude);
+    const original = `${JSON.stringify(
+      {
+        model: 'opus',
+        hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'echo hello' }] }] },
+        permissions: { allow: ['Bash(ls:*)'] },
+      },
+      null,
+      '\t',
+    )}\n`;
+    seed(path, original);
+
+    install(claude, false);
+    expect(bytesOf(path)).not.toBe(original);
+    expect(bytesOf(path)).toContain('pixelhof beat');
+    expect(bytesOf(path)).toContain('echo hello');
+    expect(bytesOf(path)).toMatch(/\n\t"model"/);
+
+    expect(uninstall(claude, false).action).toBe('written');
+    expect(bytesOf(path)).toBe(original);
+  });
+
+  test('a hand-formatted file keeps its indentation, and everything it said', () => {
+    const path = configFileFor(claude);
+    const original = '{\n\t"model": "opus",\n\t"permissions": { "allow": ["Bash(ls:*)"] }\n}\n';
+    seed(path, original);
+    const before = JSON.parse(original);
+
+    install(claude, false);
+    uninstall(claude, false);
+
+    // A round trip through JSON.parse cannot put back where a person chose to
+    // break their lines, so the file comes back laid out the way JSON.stringify
+    // lays it out, in the indentation it was found in, saying the same thing.
+    expect(JSON.parse(bytesOf(path))).toEqual(before);
+    expect(bytesOf(path)).toMatch(/\n\t"model"/);
+  });
+
+  test('a file with no entries of ours is left exactly alone', () => {
+    const path = configFileFor(claude);
+    const original = '{\n  "model": "opus"\n}\n';
+    seed(path, original);
+    expect(uninstall(claude, false).action).toBe('absent');
+    expect(bytesOf(path)).toBe(original);
+  });
+
+  test('an agent that was never installed reports nothing to remove', () => {
+    expect(uninstall(claude, false).action).toBe('absent');
+  });
+
+  test('a dry run reports the removal and removes nothing', () => {
+    install(claude, false);
+    expect(uninstall(claude, true).action).toBe('removed');
+    expect(isInstalled(claude)).toBe(true);
+  });
+
+  test('an entry left by an older version is removed even under a stale event name', () => {
+    const path = configFileFor(claude);
+    seed(
+      path,
+      JSON.stringify(
+        {
+          model: 'opus',
+          hooks: {
+            SubagentStop: [{ hooks: [{ command: 'npx -y pixelhof beat --agent claude-code' }] }],
+          },
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    expect(uninstall(claude, false).action).toBe('written');
+    expect(JSON.parse(bytesOf(path))).toEqual({ model: 'opus' });
+  });
+});

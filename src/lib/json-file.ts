@@ -5,9 +5,15 @@ import { dirname } from 'node:path';
  * Reading and writing somebody else's settings file.
  *
  * The file belongs to the person, not to this CLI, so it goes back out shaped
- * the way it came in: the same indentation, the same trailing newline. That is
- * what lets an uninstall leave a file the installer touched byte for byte as it
- * was found, which is the only promise that makes writing to it defensible.
+ * the way it came in: the same indentation, the same trailing newline. A file
+ * already laid out the way `JSON.stringify` lays one out therefore comes back
+ * byte for byte after an install and an uninstall, which is the promise that
+ * makes writing to somebody else's settings defensible.
+ *
+ * What a parse cannot give back is where a person chose to break their own
+ * lines, so a hand-formatted file is returned saying exactly what it said, in
+ * the indentation it was found in, on lines of this CLI's choosing. A file that
+ * is not JSON at all is refused rather than guessed at.
  */
 
 export type JsonFile = {
