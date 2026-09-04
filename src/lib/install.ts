@@ -1,6 +1,6 @@
-import { accessSync, constants } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { join, sep } from 'node:path';
 import { hasBeats, isOnlyBase, withBeats, withoutBeats } from './hooks.js';
 import type { Integration } from './integrations.js';
 import { readJsonFile, removeFile, renderJsonFile, writeJsonFile } from './json-file.js';
@@ -28,33 +28,51 @@ export const configFileFor = (integration: Integration): string =>
   join(homedir(), integration.file);
 
 /**
- * The command the hook will run.
+ * How this CLI was started, which is what decides the command it writes.
  *
- * A globally installed binary is preferred because it costs a process start; a
- * fallback through `npx` costs a registry check on a machine that has no copy.
- * Both end at the same `beat`, so an entry stays recognisable either way.
+ * A hook installed as `npx -y pixelhof beat` makes npx resolve the package
+ * again on every tool call: a registry check and a few hundred milliseconds,
+ * hundreds of times an hour, for a file already on the disk. So an install that
+ * can name a real file names it, and only a run out of npx's own cache writes
+ * the npx form, because that copy is temporary and will not be there tomorrow.
  */
-export function beatCommand(agentId: string, onPath = isOnPath('pixelhof')): string {
-  return `${onPath ? 'pixelhof' : 'npx -y pixelhof'} beat --agent ${agentId}`;
-}
+export type Launch = { kind: 'installed'; script: string } | { kind: 'npx' };
 
-export function isOnPath(binary: string): boolean {
-  for (const dir of (process.env['PATH'] ?? '').split(delimiter)) {
-    if (dir === '') continue;
-    try {
-      accessSync(join(dir, binary), constants.X_OK);
-      return true;
-    } catch {
-      // Not here; try the next one.
-    }
+/** npm's cache for packages it fetched to run once. */
+const NPX_CACHE = '_npx';
+
+export function launchOf(argv1: string | undefined = process.argv[1]): Launch {
+  if (argv1 === undefined) return { kind: 'npx' };
+  let script: string;
+  try {
+    script = realpathSync(argv1);
+  } catch {
+    return { kind: 'npx' };
   }
-  return false;
+  // Node runs the file, so a file node cannot run is no use in a hook. This is
+  // what sends a `tsx src/index.ts` run down the npx path.
+  if (!script.endsWith('.js')) return { kind: 'npx' };
+  return script.split(sep).includes(NPX_CACHE) ? { kind: 'npx' } : { kind: 'installed', script };
 }
 
-export function install(integration: Integration, dryRun: boolean): Change {
+const viaNpx = (agentId: string): string => `npx -y pixelhof beat --agent ${agentId}`;
+
+/**
+ * The command the hook will run. Both paths are quoted, because a home
+ * directory with a space in it is somebody's ordinary Tuesday.
+ */
+export function beatCommand(agentId: string, launch: Launch = launchOf()): string {
+  if (launch.kind === 'npx') return viaNpx(agentId);
+  const direct = `"${process.execPath}" "${launch.script}" beat --agent ${agentId}`;
+  // An entry `uninstall` could not find again is worse than a slow one, so a
+  // command that does not carry both markers is not written at all.
+  return hasBeats(direct) ? direct : viaNpx(agentId);
+}
+
+export function install(integration: Integration, dryRun: boolean, launch = launchOf()): Change {
   const path = configFileFor(integration);
   const file = readJsonFile(path);
-  const next = withBeats(file.doc, integration, beatCommand(integration.id));
+  const next = withBeats(file.doc, integration, beatCommand(integration.id, launch));
   const unchanged = file.existed && renderJsonFile(file, next) === renderJsonFile(file, file.doc);
   if (!unchanged && !dryRun) writeJsonFile(file, next);
   return {

@@ -10,13 +10,25 @@ import type { Integration } from './integrations.js';
  * a key nobody else would think to look for.
  */
 
-/** The substring that says an entry belongs to this CLI. */
-export const BEAT_MARKER = 'pixelhof beat';
+/**
+ * What says an entry belongs to this CLI: the package's name, and the
+ * subcommand only this CLI has. Both, because either alone is too eager.
+ *
+ * Two commands run the same beat. One names the package (`npx -y pixelhof
+ * beat`), the other names the file the package installed (`"/…/node"
+ * "/…/pixelhof/dist/index.js" beat`). A single substring cannot catch both, so
+ * the marker is the pair they share, and an entry is ours only if it carries
+ * each.
+ */
+export const BEAT_MARKERS = ['pixelhof', 'beat --agent'] as const;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const isOurs = (entry: unknown): boolean => JSON.stringify(entry ?? null).includes(BEAT_MARKER);
+const isOurs = (entry: unknown): boolean => {
+  const text = JSON.stringify(entry ?? null);
+  return BEAT_MARKERS.every((marker) => text.includes(marker));
+};
 
 /**
  * The document with this CLI's entries put in.

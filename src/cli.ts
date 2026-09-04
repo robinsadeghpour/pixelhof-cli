@@ -2,7 +2,15 @@ import { Command } from 'commander';
 import { ApiError, fetchMyWork } from './lib/api.js';
 import { clearConfig, configPath, needsLogin, readConfig, resolveUrl, writeConfig } from './lib/config.js';
 import { DeviceError, deviceLogin, openBrowser } from './lib/device.js';
-import { type Change, beatCommand, configFileFor, install, isInstalled, uninstall } from './lib/install.js';
+import {
+  type Change,
+  beatCommand,
+  configFileFor,
+  install,
+  isInstalled,
+  launchOf,
+  uninstall,
+} from './lib/install.js';
 import { INTEGRATIONS, type Integration } from './lib/integrations.js';
 
 /**
@@ -103,7 +111,12 @@ function runDoctor(): void {
     say(`  ${integration.label.padEnd(12)} ${state.padEnd(14)} ${configFileFor(integration)}${caveat}`);
   }
   say();
-  say(`Hooks run: ${beatCommand('<agent>')}`);
+  const launch = launchOf();
+  say(`Hooks run: ${beatCommand('<agent>', launch)}`);
+  if (launch.kind === 'npx') {
+    say('  through npx, which resolves the package again on every call.');
+    say('  `npm i -g pixelhof && pixelhof install` writes a direct path instead.');
+  }
 }
 
 export async function main(argv: readonly string[]): Promise<void> {
@@ -139,11 +152,18 @@ export async function main(argv: readonly string[]): Promise<void> {
       if (targets.length === 0) {
         program.error(`No agent called ${options.agent}. Try one of ${AGENT_CHOICES.join(', ')}.`);
       }
+      const launch = launchOf();
       reportChanges(
-        targets.map((i) => install(i, options.dryRun)),
+        targets.map((i) => install(i, options.dryRun, launch)),
         options.dryRun,
       );
       say();
+      if (launch.kind === 'npx') {
+        say('That hook goes through npx, which looks the package up again on every');
+        say('tool call. `npm i -g pixelhof && pixelhof install` writes a direct path');
+        say('instead, and the hook stops costing anything worth measuring.');
+        say();
+      }
       say('The hook sends a session id, the agent name, the event and the time.');
       say('Never your code, your prompts or your paths.');
     });

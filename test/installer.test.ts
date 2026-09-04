@@ -1,8 +1,17 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { beatCommand, configFileFor, install, isInstalled, uninstall } from '../src/lib/install.js';
+import { beatCommand, configFileFor, install, isInstalled, launchOf, uninstall } from '../src/lib/install.js';
+import { hasBeats } from '../src/lib/hooks.js';
 import { INTEGRATIONS, integrationFor } from '../src/lib/integrations.js';
 
 /**
@@ -30,6 +39,9 @@ afterEach(() => {
 
 const claude = integrationFor('claude-code')!;
 
+/** Vitest's own argv would otherwise decide which command these tests write. */
+const NPX = { kind: 'npx' } as const;
+
 const bytesOf = (path: string): string => readFileSync(path, 'utf8');
 
 function seed(path: string, text: string): void {
@@ -40,40 +52,89 @@ function seed(path: string, text: string): void {
 describe('install', () => {
   test('writes into every agent, then reports the second run as a no-op', () => {
     for (const integration of INTEGRATIONS) {
-      expect(install(integration, false).action, integration.id).toBe('written');
+      expect(install(integration, false, NPX).action, integration.id).toBe('written');
     }
     for (const integration of INTEGRATIONS) {
-      expect(install(integration, false).action, integration.id).toBe('unchanged');
+      expect(install(integration, false, NPX).action, integration.id).toBe('unchanged');
       expect(isInstalled(integration), integration.id).toBe(true);
     }
   });
 
   test('installing twice leaves the same bytes as installing once', () => {
     for (const integration of INTEGRATIONS) {
-      install(integration, false);
+      install(integration, false, NPX);
       const once = bytesOf(configFileFor(integration));
-      install(integration, false);
+      install(integration, false, NPX);
       expect(bytesOf(configFileFor(integration)), integration.id).toBe(once);
     }
   });
 
   test('a dry run changes nothing on disk', () => {
     for (const integration of INTEGRATIONS) {
-      expect(install(integration, true).action).toBe('written');
+      expect(install(integration, true, NPX).action).toBe('written');
       expect(isInstalled(integration), integration.id).toBe(false);
     }
   });
 
-  test('the hook command names the agent, and prefers a binary on PATH', () => {
-    expect(beatCommand('cursor', true)).toBe('pixelhof beat --agent cursor');
-    expect(beatCommand('cursor', false)).toBe('npx -y pixelhof beat --agent cursor');
+  test('a real install is written as a path node can run, with both parts quoted', () => {
+    const command = beatCommand('cursor', { kind: 'installed', script: '/opt/pixelhof/dist/index.js' });
+    expect(command).toBe(`"${process.execPath}" "/opt/pixelhof/dist/index.js" beat --agent cursor`);
+    expect(command).not.toContain('npx');
+  });
+
+  test('only a copy living in npx\'s own cache is written as an npx call', () => {
+    expect(beatCommand('cursor', { kind: 'npx' })).toBe('npx -y pixelhof beat --agent cursor');
+  });
+
+  test('either form is recognisable as ours, which is what uninstall needs', () => {
+    for (const launch of [
+      { kind: 'installed', script: '/opt/pixelhof/dist/index.js' },
+      { kind: 'npx' },
+    ] as const) {
+      expect(hasBeats(beatCommand('cursor', launch)), launch.kind).toBe(true);
+    }
+  });
+
+  test('a command that could never be found again is not written at all', () => {
+    // Nothing in this path says `pixelhof`, so the entry would survive an
+    // uninstall. The npx form is slower and removable, which wins.
+    expect(beatCommand('cursor', { kind: 'installed', script: '/opt/anon/dist/index.js' })).toBe(
+      'npx -y pixelhof beat --agent cursor',
+    );
+  });
+});
+
+describe('working out how this CLI was started', () => {
+  test('a file node cannot run is not written into a hook', () => {
+    expect(launchOf(join(process.cwd(), 'src', 'index.ts'))).toEqual({ kind: 'npx' });
+  });
+
+  test('a path that does not exist is not written into a hook', () => {
+    expect(launchOf('/no/such/pixelhof')).toEqual({ kind: 'npx' });
+  });
+
+  test('a copy in npx\'s cache is temporary, so it is named by package and not by path', () => {
+    const cached = join(home, '.npm', '_npx', 'abc123', 'node_modules', 'pixelhof', 'dist', 'index.js');
+    mkdirSync(dirname(cached), { recursive: true });
+    writeFileSync(cached, '', 'utf8');
+    expect(launchOf(cached)).toEqual({ kind: 'npx' });
+  });
+
+  test('a real install is followed through its symlink to the file itself', () => {
+    const real = join(home, 'lib', 'node_modules', 'pixelhof', 'dist', 'index.js');
+    mkdirSync(dirname(real), { recursive: true });
+    writeFileSync(real, '', 'utf8');
+    const bin = join(home, 'bin', 'pixelhof');
+    mkdirSync(dirname(bin), { recursive: true });
+    symlinkSync(real, bin);
+    expect(launchOf(bin)).toEqual({ kind: 'installed', script: realpathSync(real) });
   });
 });
 
 describe('uninstall', () => {
   test('a file this CLI created is taken away again, not left empty', () => {
     for (const integration of INTEGRATIONS) {
-      install(integration, false);
+      install(integration, false, NPX);
       expect(uninstall(integration, false).action, integration.id).toBe('removed');
       expect(isInstalled(integration), integration.id).toBe(false);
     }
@@ -92,7 +153,7 @@ describe('uninstall', () => {
     )}\n`;
     seed(path, original);
 
-    install(claude, false);
+    install(claude, false, NPX);
     expect(bytesOf(path)).not.toBe(original);
     expect(bytesOf(path)).toContain('pixelhof beat');
     expect(bytesOf(path)).toContain('echo hello');
@@ -108,7 +169,7 @@ describe('uninstall', () => {
     seed(path, original);
     const before = JSON.parse(original);
 
-    install(claude, false);
+    install(claude, false, NPX);
     uninstall(claude, false);
 
     // A round trip through JSON.parse cannot put back where a person chose to
@@ -131,7 +192,7 @@ describe('uninstall', () => {
   });
 
   test('a dry run reports the removal and removes nothing', () => {
-    install(claude, false);
+    install(claude, false, NPX);
     expect(uninstall(claude, true).action).toBe('removed');
     expect(isInstalled(claude)).toBe(true);
   });

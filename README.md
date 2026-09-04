@@ -10,13 +10,17 @@ agent is at it, and a handful of commands to set it up and check on it.
 ## Getting started
 
 ```
-npx pixelhof login
-npx pixelhof install
+npm i -g pixelhof
+pixelhof login
+pixelhof install
 ```
 
 `login` opens your browser and shows a short code to confirm. `install` adds a
 hook to every coding agent it can find a config for. Then work as you normally
 would.
+
+`npx pixelhof login && npx pixelhof install` works too, but install it properly
+if you can. See [what the hook runs](#what-the-hook-runs) for why.
 
 ```
 pixelhof status
@@ -24,7 +28,7 @@ pixelhof status
 
 ```
 Robin Faraj
-1,240 XP, 18 h, 3 on the board
+1,240 XP, 18 h, 3rd on the board
 Today: 34 min, 34 XP, 5 coins
 ```
 
@@ -45,7 +49,8 @@ your agent hands the hook is read for one field and discarded.
 
 A plain beat within 45 seconds of the last one for that session is dropped
 before it leaves the machine, so a busy hour is a few dozen small requests and
-not a few thousand. A `start` and a `stop` are always sent. Every request gives
+not a few thousand. What that costs is one small file read, inside a process
+that starts and exits. A `start` and a `stop` are always sent. Every request gives
 up after two seconds, and the hook exits quietly whatever happens: a site that
 is slow or down is not going to cost you a keystroke.
 
@@ -84,6 +89,32 @@ reference. **Gemini CLI's was not.** The only reference found for it is a
 community-run site rather than a Google one, so treat that row as a best reading
 and check the file after installing. Every command that touches it says so.
 
+## What the hook runs
+
+The hook fires after every tool call your agent makes, so what it runs matters
+more than it looks like it should.
+
+When you have really installed this package, `install` writes the path to the
+file npm put on your disk:
+
+```
+"/usr/local/bin/node" "/usr/local/lib/node_modules/pixelhof/dist/index.js" beat --agent claude-code
+```
+
+That starts one process and exits. When you run `install` through `npx`, there
+is no such file to point at tomorrow, so it writes `npx -y pixelhof beat
+--agent claude-code` and says so. That form makes npx resolve the package again
+on every single tool call, which is a registry check and a few hundred
+milliseconds, hundreds of times an hour. It works, and you should not leave it
+that way: `npm i -g pixelhof && pixelhof install` rewrites the entries in place.
+
+`pixelhof doctor` shows which of the two you have. `uninstall` removes either.
+
+The plugin below keeps the `npx` form on purpose, because installing a plugin
+does not install a package.
+
+## Idempotence
+
 Installing twice is installing once. The installer parses the file you already
 have, adds its entries, and writes it back with the indentation it found; it
 never replaces a file wholesale and never touches an entry that is not its own.
@@ -113,9 +144,10 @@ pixelhof uninstall
 pixelhof logout
 ```
 
-`uninstall` removes only the entries whose command runs `pixelhof beat`, and
-leaves everything else in the file exactly as it was. An entry an older version
-put somewhere else is removed too. A file that held nothing but these entries is
+`uninstall` removes only the entries whose command names `pixelhof` and runs
+`beat --agent`, which catches both forms above, and leaves everything else in
+the file exactly as it was. An entry an older version put under a different
+event is removed too. A file that held nothing but these entries is
 deleted rather than left behind empty.
 
 `logout` deletes `~/.pixelhof/config.json`. To be rid of the last of it, remove
