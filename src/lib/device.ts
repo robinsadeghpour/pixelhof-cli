@@ -45,10 +45,29 @@ const endpoint = (url: string, path: string): string => `${url.replace(/\/+$/, '
 const absolute = (uri: string, base: string): string =>
   /^https?:\/\//.test(uri) ? uri : endpoint(base, uri.startsWith('/') ? uri : `/${uri}`);
 
-async function postJson(url: string, body: unknown): Promise<{ status: number; body: unknown }> {
-  const response = await fetch(url, {
+/**
+ * The site the request claims to come from.
+ *
+ * better-auth turns away a POST to its own routes whose `Origin` it does not
+ * trust, and a CLI sends none of its own accord because it is not a browser.
+ * So it says the site it is signing in to, which is the one the token will be
+ * used against. An Origin is a scheme and a host, never a path, so it is
+ * derived rather than copied.
+ */
+const originOf = (base: string): string => new URL(base).origin;
+
+async function postJson(
+  base: string,
+  path: string,
+  body: unknown,
+): Promise<{ status: number; body: unknown }> {
+  const response = await fetch(endpoint(base, path), {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json',
+      origin: originOf(base),
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
@@ -81,9 +100,7 @@ function errorMessage(body: unknown, fallback: string): string {
 }
 
 export async function requestDeviceCode(url: string): Promise<DeviceCode> {
-  const { status, body } = await postJson(endpoint(url, '/api/auth/device/code'), {
-    client_id: CLIENT_ID,
-  });
+  const { status, body } = await postJson(url, '/api/auth/device/code', { client_id: CLIENT_ID });
   if (status !== 200) {
     throw new DeviceError(errorMessage(body, `${url} would not start a sign-in (${status}).`));
   }
@@ -116,7 +133,7 @@ export async function pollForToken(
   let wait = Math.max(code.interval, 1) * 1000;
   while (io.now() < deadline) {
     await io.sleep(wait);
-    const { status, body } = await postJson(endpoint(url, '/api/auth/device/token'), {
+    const { status, body } = await postJson(url, '/api/auth/device/token', {
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       device_code: code.device_code,
       client_id: CLIENT_ID,
@@ -152,11 +169,12 @@ export async function pollForToken(
 /** The whole flow, from asking for a code to holding a token. */
 export async function deviceLogin(url: string, io: DeviceIo): Promise<string> {
   const code = await requestDeviceCode(url);
-  const page = absolute(code.verification_uri, url);
-  const complete = code.verification_uri_complete;
+  // The complete URL carries the code in it, so the page can fill it in and the
+  // person only has to check that what they see matches what is on the terminal.
+  const page = absolute(code.verification_uri_complete ?? code.verification_uri, url);
   io.print(`Your code is ${code.user_code}`);
-  io.print(`Type it in at ${page}`);
-  io.open(complete === undefined ? page : absolute(complete, url));
+  io.print(`Confirm it at ${page}`);
+  io.open(page);
   io.print('Waiting for you to confirm it...');
   return pollForToken(url, code, io);
 }

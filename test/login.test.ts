@@ -13,6 +13,9 @@ import { DeviceError, type DeviceIo, deviceLogin } from '../src/lib/device.js';
 
 type Reply = { status: number; body: unknown };
 
+/** What better-auth answers a POST to its own routes that claims no origin it trusts. */
+const FORBIDDEN: Reply = { status: 403, body: { message: 'Invalid origin' } };
+
 let server: Server | undefined;
 
 afterEach(async () => {
@@ -21,8 +24,28 @@ afterEach(async () => {
 });
 
 async function fakeSite(replies: readonly Reply[], codeReply?: Reply) {
-  const seen: { path: string; body: unknown }[] = [];
+  const seen: { path: string; body: unknown; origin: string | undefined }[] = [];
   let poll = 0;
+  let base = '';
+  const answer = (path: string, origin: string | undefined): Reply => {
+    if (origin !== base) return FORBIDDEN;
+    if (path !== '/api/auth/device/code') {
+      return replies[Math.min(poll++, replies.length - 1)] as Reply;
+    }
+    return (
+      codeReply ?? {
+        status: 200,
+        body: {
+          device_code: 'the-long-one',
+          user_code: 'WDJB-MJHT',
+          verification_uri: '/device',
+          verification_uri_complete: '/device?user_code=WDJB-MJHT',
+          expires_in: 1800,
+          interval: 5,
+        },
+      }
+    );
+  };
   server = createServer((request, response) => {
     let raw = '';
     request.on('data', (chunk) => {
@@ -30,28 +53,17 @@ async function fakeSite(replies: readonly Reply[], codeReply?: Reply) {
     });
     request.on('end', () => {
       const body: unknown = raw === '' ? null : JSON.parse(raw);
-      seen.push({ path: request.url ?? '', body });
-      const reply =
-        request.url === '/api/auth/device/code'
-          ? (codeReply ?? {
-              status: 200,
-              body: {
-                device_code: 'the-long-one',
-                user_code: 'WDJB-MJHT',
-                verification_uri: '/device',
-                verification_uri_complete: '/device?user_code=WDJB-MJHT',
-                expires_in: 1800,
-                interval: 5,
-              },
-            })
-          : (replies[Math.min(poll++, replies.length - 1)] as Reply);
+      const origin = request.headers.origin;
+      seen.push({ path: request.url ?? '', body, origin });
+      const reply = answer(request.url ?? '', origin);
       response.writeHead(reply.status, { 'content-type': 'application/json' });
       response.end(JSON.stringify(reply.body));
     });
   });
   await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', resolve));
   const { port } = server?.address() as AddressInfo;
-  return { url: `http://127.0.0.1:${port}`, seen };
+  base = `http://127.0.0.1:${port}`;
+  return { url: base, seen };
 }
 
 function recordingIo(): DeviceIo & { lines: string[]; opened: string[]; waits: number[] } {
@@ -94,6 +106,7 @@ describe('the device flow', () => {
       '/api/auth/device/token',
     ]);
     expect(seen[0]?.body).toEqual({ client_id: CLIENT_ID });
+    expect(seen.map((r) => r.origin)).toEqual([url, url, url, url]);
     expect(seen[1]?.body).toEqual({
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       device_code: 'the-long-one',
@@ -137,6 +150,15 @@ describe('the device flow', () => {
       { status: 400, body: { error: 'expired_token', error_description: 'Device code has expired' } },
     ]);
     await expect(deviceLogin(url, recordingIo())).rejects.toThrow(/pixelhof login/);
+  });
+
+  test('every request to the auth routes says which site it is signing in to', async () => {
+    const { url, seen } = await fakeSite([{ status: 200, body: { access_token: 'a-session-token' } }]);
+    await deviceLogin(url, recordingIo());
+    // A better-auth route turns away a POST whose Origin it does not trust, so
+    // a run that reached a token at all proves the header went out on both.
+    expect(seen.every((r) => r.origin === url)).toBe(true);
+    expect(new URL(url).origin).toBe(url);
   });
 
   test('a site that will not start a sign-in says so before any polling', async () => {
