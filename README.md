@@ -129,7 +129,7 @@ was found in, on lines of this tool's choosing.
 ## As a Claude Code plugin
 
 ```
-/plugin marketplace add robinfaraj/pixelhof-cli
+/plugin marketplace add robinsadeghpour/pixelhof-cli
 /plugin install pixelhof
 ```
 
