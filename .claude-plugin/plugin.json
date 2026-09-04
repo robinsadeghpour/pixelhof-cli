@@ -1,0 +1,11 @@
+{
+  "name": "pixelhof",
+  "displayName": "Pixelhof",
+  "version": "0.1.0",
+  "description": "While Claude Code works, a worker stands on your land in Pixelhof and earns.",
+  "author": { "name": "Robin Faraj" },
+  "homepage": "https://pixelhof.com",
+  "repository": "https://github.com/robinfaraj/pixelhof-cli",
+  "license": "MIT",
+  "keywords": ["pixelhof", "presence", "game"]
+}

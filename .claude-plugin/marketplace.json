@@ -1,0 +1,12 @@
+{
+  "name": "pixelhof",
+  "owner": { "name": "Robin Faraj" },
+  "description": "The Pixelhof plugin, which puts a worker on your land while your agent works.",
+  "plugins": [
+    {
+      "name": "pixelhof",
+      "source": "./",
+      "description": "While Claude Code works, a worker stands on your land in Pixelhof and earns."
+    }
+  ]
+}
