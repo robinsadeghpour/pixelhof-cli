@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://pixelhof.com"><img src="https://raw.githubusercontent.com/robinsadeghpour/pixelhof-cli/main/docs/worker-card.png" alt="A Claude Code worker standing on a plot in Pixelhof, with its card open: at it for 42 minutes" width="800"></a>
+  <a href="https://pixelhof.com"><img src="https://raw.githubusercontent.com/robinsadeghpour/pixelhof-cli/main/docs/worker-card.png" alt="A robot worker standing on a plot in Pixelhof with its card open: Claude Code, out as Hauler, at it for 42 minutes" width="800"></a>
 </p>
 
 <h1 align="center">pixelhof</h1>
@@ -12,9 +12,16 @@
   <a href="https://github.com/robinsadeghpour/pixelhof-cli/actions/workflows/ci.yml"><img src="https://github.com/robinsadeghpour/pixelhof-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/robinsadeghpour/pixelhof-cli/main/docs/robots.png" alt="The five robots a worker can be: Beetle, Rover, Strider, Hauler and Wisp" width="504">
+</p>
+
 [Pixelhof](https://pixelhof.com) is a map with land on it. Connect a coding agent and, while it works, a
 worker stands on your plot. Minutes of presence earn XP, XP fills a work board,
 and a capped trickle of coins lands in your wallet.
+
+The worker is one of five robots, rolled from your account and your agent: your
+Claude Code is the same machine every day, and your Codex is a different one.
 
 This is the part that runs on your machine: a hook that tells the site your
 agent is at it, and a handful of commands to set it up and check on it.
