@@ -1,6 +1,13 @@
-# pixelhof
+<p align="center">
+  <a href="https://pixelhof.com"><img src="https://raw.githubusercontent.com/robinsadeghpour/pixelhof-cli/main/docs/worker-card.png" alt="A Claude Code worker standing on a plot in Pixelhof, with its card open: at it for 42 minutes" width="800"></a>
+</p>
 
-Pixelhof is a map with land on it. Connect a coding agent and, while it works, a
+<h1 align="center">pixelhof</h1>
+
+<p align="center"><strong>Your coding agent, at work on your land.</strong><br>
+<a href="https://pixelhof.com">pixelhof.com</a> · <a href="https://www.npmjs.com/package/pixelhof">npm</a> · MIT</p>
+
+[Pixelhof](https://pixelhof.com) is a map with land on it. Connect a coding agent and, while it works, a
 worker stands on your plot. Minutes of presence earn XP, XP fills a work board,
 and a capped trickle of coins lands in your wallet.
 
@@ -31,6 +38,10 @@ Robin Faraj
 1,240 XP, 18 h, 3rd on the board
 Today: 34 min, 34 XP, 5 coins
 ```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/robinsadeghpour/pixelhof-cli/main/docs/work-board.png" alt="The Workers board: names ranked by XP, with hours worked and who is at work right now" width="330">
+</p>
 
 ## What is sent
 
