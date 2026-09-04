@@ -1,0 +1,56 @@
+{
+  "name": "pixelhof",
+  "version": "0.1.0",
+  "description": "Put your coding agent to work on your land in Pixelhof",
+  "type": "module",
+  "bin": {
+    "pixelhof": "dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "hooks",
+    "skills",
+    ".claude-plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "pixelhof",
+    "cli",
+    "hooks",
+    "claude-code",
+    "codex",
+    "gemini",
+    "cursor"
+  ],
+  "license": "MIT",
+  "author": "Robin Faraj",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robinfaraj/pixelhof-cli.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "tsc"
+  },
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
