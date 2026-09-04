@@ -1,5 +1,14 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -163,6 +172,49 @@ describe('a beat as an agent runs it', () => {
     const run = await beat(payload('SessionStart'));
     expect(run.code).toBe(0);
     expect(sent).toHaveLength(0);
+  });
+});
+
+describe('the state one file per session leaves behind', () => {
+  const stateDir = (): string => join(home, '.pixelhof', 'state');
+
+  /** A file from a session that ended days ago and will never be beaten again. */
+  function stale(name: string, ageHours: number): string {
+    mkdirSync(stateDir(), { recursive: true });
+    const path = join(stateDir(), name);
+    writeFileSync(path, JSON.stringify({ sentAt: 0 }));
+    const when = (Date.now() - ageHours * 60 * 60 * 1000) / 1000;
+    utimesSync(path, when, when);
+    return path;
+  }
+
+  test('a start sweeps away what is more than a day old, and keeps the rest', async () => {
+    stale('old.json', 30);
+    stale('recent.json', 3);
+    await beat(payload('SessionStart', 'fresh'));
+    const left = readdirSync(stateDir());
+    expect(left).toContain('recent.json');
+    expect(left).not.toContain('old.json');
+  });
+
+  test('a stop sweeps too, because it is the other end of a shift', async () => {
+    stale('old.json', 48);
+    await beat(payload('SessionEnd', 'fresh'));
+    expect(readdirSync(stateDir())).not.toContain('old.json');
+  });
+
+  test('an ordinary beat never pays for the sweep', async () => {
+    stale('old.json', 48);
+    await beat(payload('PostToolUse', 'fresh'));
+    expect(readdirSync(stateDir())).toContain('old.json');
+  });
+
+  test('a session that is beaten again keeps its file, whatever its age', async () => {
+    await beat(payload('SessionStart', 'live'));
+    const [name] = readdirSync(stateDir()).filter((n) => n !== 'old.json');
+    expect(name).toBeDefined();
+    await beat(payload('SessionEnd', 'live'));
+    expect(readdirSync(stateDir())).toContain(name as string);
   });
 });
 

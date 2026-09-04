@@ -134,7 +134,9 @@ export async function runBeat(argv: readonly string[]): Promise<void> {
 
   const config = readConfig();
   if (config === null) return;
-  if (beat.event === 'start') sweepStaleState(now);
+  // One file per session would otherwise pile up forever. The two events that
+  // bracket a shift are rare enough to afford a readdir; a plain beat is not.
+  if (beat.event !== 'beat') sweepStaleState(now);
 
   recordSent(path, now);
   try {
