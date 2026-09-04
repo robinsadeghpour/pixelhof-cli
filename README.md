@@ -105,6 +105,19 @@ reference. **Gemini CLI's was not.** The only reference found for it is a
 community-run site rather than a Google one, so treat that row as a best reading
 and check the file after installing. Every command that touches it says so.
 
+## More than one account
+
+Claude Code keeps a second account's settings wherever `CLAUDE_CONFIG_DIR`
+points, and Codex does the same with `CODEX_HOME`. The installer honours both,
+so run it once per account:
+
+```
+CLAUDE_CONFIG_DIR=~/.claude-work pixelhof install --agent claude-code
+```
+
+`doctor` under the same variable shows that account's file. The sign-in is per
+machine, not per account, so one `pixelhof login` covers all of them.
+
 ## What the hook runs
 
 The hook fires after every tool call your agent makes, so what it runs matters

@@ -1,6 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, sep } from 'node:path';
+import { basename, join, sep } from 'node:path';
 import { hasBeats, isOnlyBase, withBeats, withoutBeats } from './hooks.js';
 import type { Integration } from './integrations.js';
 import { readJsonFile, removeFile, renderJsonFile, writeJsonFile } from './json-file.js';
@@ -24,8 +24,13 @@ export type Change = {
   verified: boolean;
 };
 
-export const configFileFor = (integration: Integration): string =>
-  join(homedir(), integration.file);
+export const configFileFor = (
+  integration: Integration,
+  env: NodeJS.ProcessEnv = process.env,
+): string => {
+  const dir = integration.configDirEnv ? env[integration.configDirEnv]?.trim() : undefined;
+  return dir ? join(dir, basename(integration.file)) : join(homedir(), integration.file);
+};
 
 /**
  * How this CLI was started, which is what decides the command it writes.

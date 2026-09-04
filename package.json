@@ -1,6 +1,6 @@
 {
   "name": "pixelhof",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Put your coding agent to work on your land in Pixelhof",
   "type": "module",
   "bin": {

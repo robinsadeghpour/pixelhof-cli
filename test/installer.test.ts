@@ -1,12 +1,4 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -25,15 +17,32 @@ import { INTEGRATIONS, integrationFor } from '../src/lib/integrations.js';
 let home = '';
 let realHome: string | undefined;
 
+/**
+ * The relocation variables the agents themselves honour. Cleared for every
+ * test, because a developer running this suite inside a relocated Claude
+ * Code would otherwise have the tests install into their real settings file.
+ */
+const RELOCATIONS = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'] as const;
+const realRelocations: Partial<Record<(typeof RELOCATIONS)[number], string>> = {};
+
 beforeEach(() => {
   realHome = process.env['HOME'];
   home = mkdtempSync(join(tmpdir(), 'pixelhof-test-'));
   process.env['HOME'] = home;
+  for (const name of RELOCATIONS) {
+    realRelocations[name] = process.env[name];
+    delete process.env[name];
+  }
 });
 
 afterEach(() => {
   if (realHome === undefined) delete process.env['HOME'];
   else process.env['HOME'] = realHome;
+  for (const name of RELOCATIONS) {
+    const was = realRelocations[name];
+    if (was === undefined) delete process.env[name];
+    else process.env[name] = was;
+  }
   rmSync(home, { recursive: true, force: true });
 });
 
@@ -214,5 +223,22 @@ describe('uninstall', () => {
     );
     expect(uninstall(claude, false).action).toBe('written');
     expect(JSON.parse(bytesOf(path))).toEqual({ model: 'opus' });
+  });
+});
+
+describe('a relocated agent', () => {
+  test('Claude Code under CLAUDE_CONFIG_DIR gets its hook in that directory, not in ~/.claude', () => {
+    const elsewhere = join(home, 'second-account');
+    process.env['CLAUDE_CONFIG_DIR'] = elsewhere;
+    expect(configFileFor(claude)).toBe(join(elsewhere, 'settings.json'));
+    install(claude, false, NPX);
+    expect(existsSync(join(elsewhere, 'settings.json'))).toBe(true);
+    expect(existsSync(join(home, '.claude', 'settings.json'))).toBe(false);
+    expect(isInstalled(claude)).toBe(true);
+  });
+
+  test('an empty CLAUDE_CONFIG_DIR means the default directory', () => {
+    process.env['CLAUDE_CONFIG_DIR'] = '  ';
+    expect(configFileFor(claude)).toBe(join(home, '.claude', 'settings.json'));
   });
 });

@@ -24,6 +24,13 @@ export type Integration = {
   label: string;
   /** Relative to the home directory, so a temp HOME redirects the whole install. */
   file: string;
+  /**
+   * An environment variable the agent itself reads to relocate its config
+   * directory. When it is set, the file lives there instead: a second Claude
+   * account kept under `CLAUDE_CONFIG_DIR` has its own settings file, and a
+   * hook written to `~/.claude` never fires for it.
+   */
+  configDirEnv?: string;
   verified: boolean;
   /** Keys the file must carry when this CLI is the one creating it. */
   base: Record<string, unknown>;
@@ -49,6 +56,7 @@ export const INTEGRATIONS: readonly Integration[] = [
     id: 'claude-code',
     label: 'Claude Code',
     file: '.claude/settings.json',
+    configDirEnv: 'CLAUDE_CONFIG_DIR',
     verified: true,
     base: {},
     events: {
@@ -67,6 +75,7 @@ export const INTEGRATIONS: readonly Integration[] = [
     id: 'codex',
     label: 'Codex',
     file: '.codex/hooks.json',
+    configDirEnv: 'CODEX_HOME',
     verified: true,
     base: {},
     events: {
