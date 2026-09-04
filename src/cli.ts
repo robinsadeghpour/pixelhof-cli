@@ -25,6 +25,13 @@ const chosen = (agent: string): readonly Integration[] =>
 const hours = (minutes: number): string =>
   minutes < 60 ? `${minutes} min` : `${Math.round(minutes / 60)} h`;
 
+/** 1st, 2nd, 3rd, and the teens that break the pattern. */
+function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+}
+
 function reportChanges(changes: readonly Change[], dryRun: boolean): void {
   for (const change of changes) {
     const note =
@@ -68,7 +75,7 @@ async function runStatus(): Promise<void> {
     say('That sign-in has expired. Run `pixelhof login` again.');
     return;
   }
-  const place = work.rank === null ? 'not on the board yet' : `${work.rank} on the board`;
+  const place = work.rank === null ? 'not on the board yet' : `${ordinal(work.rank)} on the board`;
   say(work.name);
   say(`${work.xp.toLocaleString('en-GB')} XP, ${hours(work.minutes)}, ${place}`);
   say(`Today: ${work.today.minutes} min, ${work.today.xp} XP, ${work.today.taler} coins`);
