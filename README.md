@@ -5,7 +5,12 @@
 <h1 align="center">pixelhof</h1>
 
 <p align="center"><strong>Your coding agent, at work on your land.</strong><br>
-<a href="https://pixelhof.com">pixelhof.com</a> · <a href="https://www.npmjs.com/package/pixelhof">npm</a> · MIT</p>
+<a href="https://pixelhof.com">pixelhof.com</a> · <a href="https://www.npmjs.com/package/pixelhof">npmjs.com/package/pixelhof</a> · MIT</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/pixelhof"><img src="https://img.shields.io/npm/v/pixelhof?label=npm&color=cb3837" alt="pixelhof on npm"></a>
+  <a href="https://github.com/robinsadeghpour/pixelhof-cli/actions/workflows/ci.yml"><img src="https://github.com/robinsadeghpour/pixelhof-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
 [Pixelhof](https://pixelhof.com) is a map with land on it. Connect a coding agent and, while it works, a
 worker stands on your plot. Minutes of presence earn XP, XP fills a work board,
