@@ -38,6 +38,13 @@ pixelhof install
 hook to every coding agent it can find a config for. Then work as you normally
 would.
 
+For Codex, open `codex` and run `/hooks` to review and trust the exact Pixelhof
+hook definitions before they can send activity. Use the same `CODEX_HOME` as
+your Codex app. Changing a hook command, including replacing `npx` with a direct
+path, requires another review. Start a fresh Codex session after review so
+`SessionStart` can run if it was skipped while untrusted. See the official
+[Codex hook review and trust guide](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks).
+
 `npx pixelhof login && npx pixelhof install` works too, but install it properly
 if you can. See [what the hook runs](#what-the-hook-runs) for why.
 
@@ -144,7 +151,11 @@ on every single tool call, which is a registry check and a few hundred
 milliseconds, hundreds of times an hour. It works, and you should not leave it
 that way: `npm i -g pixelhof && pixelhof install` rewrites the entries in place.
 
-`pixelhof doctor` shows which of the two you have. `uninstall` removes either.
+`pixelhof doctor` prints the actual commands saved in each agent's config, so
+you can see which form each agent uses. It reports them as **configured**:
+finding a command in a file does not confirm that it runs. Codex trust cannot
+be verified from `hooks.json`; check `/hooks` in Codex. `uninstall` removes
+either command form.
 
 The plugin below keeps the `npx` form on purpose, because installing a plugin
 does not install a package.

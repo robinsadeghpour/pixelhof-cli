@@ -23,8 +23,10 @@ Two answers are not failures and should be read out as they are:
   The same fix.
 
 `pixelhof doctor` says where the config lives, which site it talks to, and
-which agents have the hook installed. Reach for it when `status` looks right but
-no worker appears on the map.
+which agents have hooks configured, and the actual commands saved for each.
+Reach for it when `status` looks right but no worker appears on the map.
+Configured does not mean running: `doctor` cannot verify Codex trust from
+`hooks.json`.
 
 ## What the hook sends
 
@@ -40,10 +42,18 @@ leaving the machine.
 
 ## Why a worker is not on the map
 
-In order of likelihood: not signed in (`pixelhof doctor` says so), the hook is
-not installed for that agent (`pixelhof doctor` lists them), or the owner has no
-land yet. A worker whose owner owns no parcel earns and appears on the work
-board, but has nowhere to stand.
+For Codex with hooks configured, open `codex` and run `/hooks` to review and
+trust the exact Pixelhof hook definitions. Use the same `CODEX_HOME` as the
+Codex app. They cannot send activity until trusted. Changing a command,
+including switching from `npx` to a direct installed path, requires another
+review. Do not treat an existing `hooks.json` as proof that Codex runs it.
+Start a fresh Codex session after review so `SessionStart` can run if it was
+skipped while untrusted.
+
+Also check whether the person is signed in (`pixelhof doctor` says so), whether
+hooks are configured for their agent (`pixelhof doctor` lists them), and whether
+the owner has land. A worker whose owner owns no parcel earns and appears on
+the work board, but has nowhere to stand.
 
 ## Taking it out
 

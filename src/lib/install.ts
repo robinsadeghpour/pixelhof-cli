@@ -1,7 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, sep } from 'node:path';
-import { hasBeats, isOnlyBase, withBeats, withoutBeats } from './hooks.js';
+import { beatCommands, hasBeats, isOnlyBase, withBeats, withoutBeats } from './hooks.js';
 import type { Integration } from './integrations.js';
 import { readJsonFile, removeFile, renderJsonFile, writeJsonFile } from './json-file.js';
 
@@ -122,4 +122,8 @@ export function uninstall(integration: Integration, dryRun: boolean): Change {
 export function isInstalled(integration: Integration): boolean {
   const file = readJsonFile(configFileFor(integration));
   return file.existed && hasBeats(file.doc);
+}
+
+export function configuredCommands(integration: Integration): string[] {
+  return beatCommands(readJsonFile(configFileFor(integration)).doc);
 }

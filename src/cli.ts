@@ -4,10 +4,9 @@ import { clearConfig, configPath, needsLogin, readConfig, resolveUrl, writeConfi
 import { DeviceError, deviceLogin, openBrowser } from './lib/device.js';
 import {
   type Change,
-  beatCommand,
   configFileFor,
+  configuredCommands,
   install,
-  isInstalled,
   launchOf,
   uninstall,
 } from './lib/install.js';
@@ -32,6 +31,13 @@ const chosen = (agent: string): readonly Integration[] =>
 
 const hours = (minutes: number): string =>
   minutes < 60 ? `${minutes} min` : `${Math.round(minutes / 60)} h`;
+
+function codexTrustGuidance(): void {
+  say('Codex: open `codex`, run `/hooks`, and review/trust the exact Pixelhof hook definitions.');
+  say('  Codex must trust them before they can send activity. Trust cannot be verified from hooks.json.');
+  say('  Changing a hook command requires another review. Use the same CODEX_HOME as your Codex app.');
+  say('  Start a fresh Codex session after review so SessionStart can run.');
+}
 
 /** 1st, 2nd, 3rd, and the teens that break the pattern. */
 function ordinal(n: number): string {
@@ -105,17 +111,28 @@ function runDoctor(): void {
   say(`Account  ${account}`);
   say();
   say('Hooks');
+  let usesNpx = false;
+  let codexConfigured = false;
   for (const integration of INTEGRATIONS) {
-    const state = isInstalled(integration) ? 'installed' : 'not installed';
+    const commands = configuredCommands(integration);
+    const state = commands.length > 0 ? 'configured' : 'not configured';
     const caveat = integration.verified ? '' : '  (schema unverified, see the README)';
     say(`  ${integration.label.padEnd(12)} ${state.padEnd(14)} ${configFileFor(integration)}${caveat}`);
+    for (const command of commands) {
+      say(`    ${command}`);
+      if (/\bnpx\b/.test(command)) usesNpx = true;
+    }
+    if (integration.id === 'codex' && commands.length > 0) codexConfigured = true;
   }
   say();
-  const launch = launchOf();
-  say(`Hooks run: ${beatCommand('<agent>', launch)}`);
-  if (launch.kind === 'npx') {
-    say('  through npx, which resolves the package again on every call.');
+  say('Configured means the commands above are saved; it does not confirm they are running.');
+  if (usesNpx) {
+    say('  Some saved hooks use npx, which resolves the package again on every call.');
     say('  `npm i -g pixelhof && pixelhof install` writes a direct path instead.');
+  }
+  if (codexConfigured) {
+    say();
+    codexTrustGuidance();
   }
 }
 
@@ -162,6 +179,10 @@ export async function main(argv: readonly string[]): Promise<void> {
         say('That hook goes through npx, which looks the package up again on every');
         say('tool call. `npm i -g pixelhof && pixelhof install` writes a direct path');
         say('instead, and the hook stops costing anything worth measuring.');
+        say();
+      }
+      if (targets.some((integration) => integration.id === 'codex')) {
+        codexTrustGuidance();
         say();
       }
       say('The hook sends a session id, the agent name, the event and the time.');

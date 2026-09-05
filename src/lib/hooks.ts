@@ -30,6 +30,16 @@ const isOurs = (entry: unknown): boolean => {
   return BEAT_MARKERS.every((marker) => text.includes(marker));
 };
 
+export function beatCommands(node: unknown): string[] {
+  if (Array.isArray(node)) return [...new Set(node.flatMap(beatCommands))];
+  if (!isObject(node)) return [];
+  const commands = Object.values(node).flatMap(beatCommands);
+  if (typeof node['command'] === 'string' && isOurs(node['command'])) {
+    commands.unshift(node['command']);
+  }
+  return [...new Set(commands)];
+}
+
 /**
  * The document with this CLI's entries put in.
  *
