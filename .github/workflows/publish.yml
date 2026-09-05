@@ -16,7 +16,19 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11
+      - name: Check release versions
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+          const plugin = JSON.parse(readFileSync('.claude-plugin/plugin.json', 'utf8'));
+          if (process.env.GITHUB_REF_NAME !== `v${version}` || plugin.version !== version) {
+            throw new Error('The git tag, package version, and plugin version must match.');
+          }
+          NODE
       - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
       # Trusted publishing: npm mints a short-lived token from the GitHub OIDC
